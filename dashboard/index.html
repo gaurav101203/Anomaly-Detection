@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Anomaly Detection Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
+    --border: #2e3250; --text: #e2e8f0; --muted: #7c8db5;
+    --green: #22c55e; --yellow: #f59e0b; --red: #ef4444;
+    --blue: #60a5fa; --purple: #a78bfa;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .badge { background: var(--green); color: #000; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .badge.warn { background: var(--yellow); }
+  .badge.error { background: var(--red); }
+  main { padding: 24px; display: grid; gap: 20px; max-width: 1400px; margin: 0 auto; }
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; }
+  .stat-card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .chart-card h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 14px; }
+  .chart-wrap { position: relative; height: 180px; }
+  .alerts-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .alerts-card h2 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+  #alert-list { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .alert-row { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; }
+  .alert-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .alert-row .info { flex: 1; }
+  .alert-row .info strong { display: block; font-size: 13px; }
+  .alert-row .info span  { font-size: 11px; color: var(--muted); }
+  .alert-row .val { font-size: 13px; font-weight: 600; }
+  .dot.high   { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .dot.medium { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+  .dot.low    { background: var(--green); }
+  .no-data { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+  ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔬 Anomaly Detection Dashboard</h1>
+  <span id="status-badge" class="badge">connecting...</span>
+  <span style="margin-left:auto; color:var(--muted); font-size:12px" id="last-update">—</span>
+</header>
+
+<main>
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="label">CPU Usage</div>
+      <div class="value" id="cpu-val">—</div>
+      <div class="sub">total %</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">RAM Used</div>
+      <div class="value" id="ram-val">—</div>
+      <div class="sub">percent</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Net Received</div>
+      <div class="value" id="net-val">—</div>
+      <div class="sub">MB total</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Anomalies detected</div>
+      <div class="value" id="anomaly-count" style="color:var(--red)">0</div>
+      <div class="sub">this session</div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>CPU usage (%)</h3>
+      <div class="chart-wrap"><canvas id="cpu-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>RAM usage (%)</h3>
+      <div class="chart-wrap"><canvas id="ram-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Disk write (MB/s cumulative)</h3>
+      <div class="chart-wrap"><canvas id="disk-chart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Network received (MB cumulative)</h3>
+      <div class="chart-wrap"><canvas id="net-chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="alerts-card">
+    <h2>Recent anomalies</h2>
+    <div id="alert-list"><div class="no-data">Waiting for data...</div></div>
+  </div>
+</main>
+
+<script>
+const API = 'http://localhost:8000';
+const MAX_POINTS = 60;
+let anomalyCount = 0;
+
+// ── Chart factory ────────────────────────────────────────────────────────────
+function makeChart(id, label, color) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label,
+        data: [],
+        borderColor: color,
+        backgroundColor: color + '18',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      scales: {
+        x: { display: false },
+        y: { grid: { color: '#2e3250' }, ticks: { color: '#7c8db5', font: { size: 11 } } }
+      },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+const charts = {
+  cpu:  makeChart('cpu-chart',  'CPU %',       '#60a5fa'),
+  ram:  makeChart('ram-chart',  'RAM %',       '#a78bfa'),
+  disk: makeChart('disk-chart', 'Disk write',  '#f59e0b'),
+  net:  makeChart('net-chart',  'Net recv',    '#22c55e'),
+};
+
+function pushPoint(chart, value) {
+  const t = new Date().toLocaleTimeString();
+  chart.data.labels.push(t);
+  chart.data.datasets[0].data.push(value);
+  if (chart.data.labels.length > MAX_POINTS) {
+    chart.data.labels.shift();
+    chart.data.datasets[0].data.shift();
+  }
+  chart.update('none');
+}
+
+// ── Poll /alerts/stats for live values ───────────────────────────────────────
+const SENSORS = [
+  { id: 'my_laptop', metric: 'cpu_total_pct',   chart: 'cpu',  stat: 'cpu-val'  },
+  { id: 'my_laptop', metric: 'ram_used_pct',    chart: 'ram',  stat: 'ram-val'  },
+  { id: 'my_laptop', metric: 'disk_write_mb_s', chart: 'disk', stat: null       },
+  { id: 'my_laptop', metric: 'net_recv_mb_s',   chart: 'net',  stat: 'net-val'  },
+];
+
+async function pollStats() {
+  for (const s of SENSORS) {
+    try {
+      const r = await fetch(`${API}/alerts/stats/${s.id}/${s.metric}`);
+      if (!r.ok) continue;
+      const d = await r.json();
+      if (d.error) continue;
+      pushPoint(charts[s.chart], d.latest);
+      if (s.stat) document.getElementById(s.stat).textContent = d.latest.toFixed(1);
+    } catch (_) {}
+  }
+  document.getElementById('last-update').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+// ── Poll /alerts for recent anomalies ────────────────────────────────────────
+let knownIds = new Set();
+
+async function pollAlerts() {
+  try {
+    const r = await fetch(`${API}/alerts?limit=30&severity=high`);
+    if (!r.ok) return;
+    const data = await r.json();
+
+    const newOnes = data.filter(a => !knownIds.has(a.id));
+    newOnes.forEach(a => knownIds.add(a.id));
+
+    if (newOnes.length) {
+      anomalyCount += newOnes.length;
+      document.getElementById('anomaly-count').textContent = anomalyCount;
+    }
+
+    const list = document.getElementById('alert-list');
+    if (data.length === 0) {
+      list.innerHTML = '<div class="no-data">No anomalies detected yet</div>';
+      return;
+    }
+
+    list.innerHTML = data.map(a => `
+      <div class="alert-row">
+        <div class="dot ${a.severity}"></div>
+        <div class="info">
+          <strong>${a.sensor_id} / ${a.metric_name}</strong>
+          <span>${new Date(a.timestamp + 'Z').toLocaleString()} · z=${a.z_score?.toFixed(2) ?? '—'}σ</span>
+        </div>
+        <div class="val">${a.value.toFixed(2)}</div>
+        <span class="badge ${a.severity === 'high' ? 'error' : a.severity === 'medium' ? 'warn' : ''}">${a.severity.toUpperCase()}</span>
+      </div>`).join('');
+  } catch (_) {}
+}
+
+// ── Status badge ─────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    const badge = document.getElementById('status-badge');
+    if (r.ok) {
+      badge.textContent = 'live';
+      badge.className = 'badge';
+    } else {
+      badge.textContent = 'api error';
+      badge.className = 'badge error';
+    }
+  } catch (_) {
+    const badge = document.getElementById('status-badge');
+    badge.textContent = 'offline';
+    badge.className = 'badge error';
+  }
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+checkHealth();
+setInterval(checkHealth, 10000);
+setInterval(pollStats,  1500);
+setInterval(pollAlerts, 3000);
+pollStats();
+pollAlerts();
+</script>
+</body>
+</html>
