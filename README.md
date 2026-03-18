@@ -9,15 +9,17 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker)
 
 ---
+
 <img width="1920" height="1080" alt="Screenshot (40)" src="https://github.com/user-attachments/assets/53574e90-31a5-49b1-b859-e5a33e78facc" />
 
 ## 🎯 What it does
 
-Most monitoring tools just *show* you data. This system *understands* it.
+Most monitoring tools just _show_ you data. This system _understands_ it.
 
 Every incoming data point is evaluated against a **sliding window of the last 100 readings** using two complementary ML methods. If either method flags it as unusual for that sensor's historical pattern, an alert fires instantly — no manual threshold-setting required.
 
 **Real use cases this architecture maps to:**
+
 - Server fleet monitoring across hundreds of microservices
 - IoT sensor networks detecting equipment failure before it happens
 - Financial fraud detection (same math, different data source)
@@ -48,33 +50,35 @@ Live data sources (psutil / IoT / APIs)
 
 ## ⚙️ Tech Stack
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| API | FastAPI + uvicorn | Async REST + WebSocket endpoints |
-| Buffer | Redis (sliding window) | Low-latency in-memory time-series |
-| Detection | scikit-learn Isolation Forest | Context-aware anomaly detection |
-| Detection | Z-score (NumPy) | Fast statistical outlier detection |
-| Storage | MySQL + SQLAlchemy async | Persistent anomaly log |
-| Streaming | psutil | Live PC metrics (CPU, RAM, disk, network) |
-| Alerts | httpx webhooks | Slack + custom endpoint notifications |
-| Deploy | Docker Compose | One-command setup for all services |
+| Layer     | Technology                    | Purpose                                   |
+| --------- | ----------------------------- | ----------------------------------------- |
+| API       | FastAPI + uvicorn             | Async REST + WebSocket endpoints          |
+| Buffer    | Redis (sliding window)        | Low-latency in-memory time-series         |
+| Detection | scikit-learn Isolation Forest | Context-aware anomaly detection           |
+| Detection | Z-score (NumPy)               | Fast statistical outlier detection        |
+| Storage   | MySQL + SQLAlchemy async      | Persistent anomaly log                    |
+| Streaming | psutil                        | Live PC metrics (CPU, RAM, disk, network) |
+| Alerts    | httpx webhooks                | Slack + custom endpoint notifications     |
+| Deploy    | Docker Compose                | One-command setup for all services        |
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Docker Desktop installed and running
 
 ### 1. Clone and start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/anomaly-detector.git
+git clone https://github.com/gaurav101203/anomaly-detector.git
 cd anomaly-detector
 docker compose up --build
 ```
 
 Wait for:
+
 ```
 api-1  | INFO: Application startup complete.
 ```
@@ -104,13 +108,13 @@ python -c "import math; [math.factorial(100000) for _ in range(9999999)]"
 
 ## 📡 API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/ingest` | Ingest a data point, returns anomaly result instantly |
-| `GET` | `/alerts` | List anomalies — filter by `severity`, `sensor_id`, `limit` |
-| `GET` | `/alerts/stats/{sensor_id}/{metric}` | Live stats for any sensor |
-| `GET` | `/alerts/active-sensors` | All currently active sensors |
-| `WS` | `/stream/{sensor_id}/{metric}` | WebSocket live data stream |
+| Method | Endpoint                             | Description                                                 |
+| ------ | ------------------------------------ | ----------------------------------------------------------- |
+| `POST` | `/ingest`                            | Ingest a data point, returns anomaly result instantly       |
+| `GET`  | `/alerts`                            | List anomalies — filter by `severity`, `sensor_id`, `limit` |
+| `GET`  | `/alerts/stats/{sensor_id}/{metric}` | Live stats for any sensor                                   |
+| `GET`  | `/alerts/active-sensors`             | All currently active sensors                                |
+| `WS`   | `/stream/{sensor_id}/{metric}`       | WebSocket live data stream                                  |
 
 ### Example — ingest a reading
 
@@ -148,15 +152,15 @@ Two methods run on **every single data point**:
 
 **Z-score** — measures how many standard deviations the new value is from the sliding window mean. Fast, interpretable, great for simple spikes.
 
-**Isolation Forest** — an ensemble of random trees that isolates outliers by how few splits it takes to separate a point from the rest of the data. Catches complex, contextual anomalies that Z-score misses (e.g. a value that is not statistically extreme but is unusual *in context*).
+**Isolation Forest** — an ensemble of random trees that isolates outliers by how few splits it takes to separate a point from the rest of the data. Catches complex, contextual anomalies that Z-score misses (e.g. a value that is not statistically extreme but is unusual _in context_).
 
 A point is flagged as anomalous if **either** method triggers.
 
-| Z-score | Severity |
-|---------|----------|
-| > 2.0σ | 🟢 Low |
-| > 2.5σ | 🟡 Medium |
-| > 3.5σ | 🔴 High |
+| Z-score | Severity  |
+| ------- | --------- |
+| > 2.0σ  | 🟢 Low    |
+| > 2.5σ  | 🟡 Medium |
+| > 3.5σ  | 🔴 High   |
 
 ---
 
@@ -177,4 +181,3 @@ z_anomaly = z_score > 2.0    # lower = more sensitive
 This matters at scale — at 1-second intervals across 8 metrics on 500 servers, you generate **240,000 data points per minute**. Configurable intervals and severity filtering are essential for keeping the system usable.
 
 ---
-
