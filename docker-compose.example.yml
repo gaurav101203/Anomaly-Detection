@@ -1,0 +1,48 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=mysql://YOUR_DB_USER:YOUR_DB_PASSWORD@db:3306/anomaly_db
+      - REDIS_URL=redis://redis:6379
+      - SLACK_WEBHOOK_URL=        # optional — paste your Slack webhook here
+      - ALERT_WEBHOOK_URL=        # optional — custom webhook endpoint
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: anomaly_db
+      MYSQL_USER: YOUR_DB_USER
+      MYSQL_PASSWORD: YOUR_DB_PASSWORD
+      MYSQL_ROOT_PASSWORD: YOUR_ROOT_PASSWORD
+    ports:
+      - "3307:3306"          # 3307 avoids conflict if MySQL is installed locally
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "YOUR_DB_USER", "-pYOUR_DB_PASSWORD"]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mysql_data:
+  redis_data:
