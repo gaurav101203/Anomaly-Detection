@@ -9,6 +9,7 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker)
 
 ---
+<img width="1920" height="1080" alt="Screenshot (40)" src="https://github.com/user-attachments/assets/53574e90-31a5-49b1-b859-e5a33e78facc" />
 
 ## 🎯 What it does
 
@@ -177,69 +178,3 @@ This matters at scale — at 1-second intervals across 8 metrics on 500 servers,
 
 ---
 
-## 📁 Project Structure
-
-```
-anomaly-detector/
-├── app/
-│   ├── main.py              # FastAPI app + lifespan
-│   ├── models.py            # Pydantic + SQLAlchemy models
-│   ├── database.py          # Async MySQL (aiomysql)
-│   ├── redis_client.py      # Sliding window buffer
-│   ├── detector.py          # Isolation Forest + Z-score engine
-│   ├── alerter.py           # Slack + webhook alerts
-│   └── routers/
-│       ├── ingest.py        # POST /ingest
-│       ├── stream.py        # WebSocket /stream
-│       └── alerts.py        # GET /alerts (with filters)
-├── scripts/
-│   └── pc_metrics_streamer.py   # Streams real PC metrics via psutil
-├── dashboard/
-│   └── index.html           # Live dark-mode monitoring dashboard
-├── wait-for-db.py           # Pre-startup DB readiness check
-├── docker-compose.yml
-├── Dockerfile
-└── requirements.txt
-```
-
----
-
-## 🔔 Slack Alerts (optional)
-
-Add your Slack webhook URL to `docker-compose.yml`:
-
-```yaml
-environment:
-  - SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/HERE
-```
-
-You'll get alerts like:
-
-```
-🔴 Anomaly detected on `server_01`
-Metric: cpu_usage  |  Value: 97.30
-Severity: HIGH     |  Z-score: 5.42σ
-Normal range: 14.2 ± 3.1
-```
-
----
-
-## 💡 Extending the Project
-
-The ingestion layer is **data-agnostic** — swap `pc_metrics_streamer.py` for any data source:
-
-```python
-# Crypto prices (CoinGecko — no API key needed)
-price = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd").json()["bitcoin"]["usd"]
-requests.post("http://localhost:8000/ingest", json={"sensor_id": "crypto", "metric_name": "btc_usd", "value": price})
-
-# Weather data (Open-Meteo — no API key needed)
-temp = requests.get("https://api.open-meteo.com/v1/forecast?latitude=19.07&longitude=72.87&current=temperature_2m").json()["current"]["temperature_2m"]
-requests.post("http://localhost:8000/ingest", json={"sensor_id": "mumbai", "metric_name": "temperature", "value": temp})
-```
-
----
-
-## 📄 License
-
-MIT
